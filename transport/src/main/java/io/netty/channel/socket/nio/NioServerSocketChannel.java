@@ -51,6 +51,11 @@ public class NioServerSocketChannel extends AbstractNioMessageChannel
 
     private static final InternalLogger logger = InternalLoggerFactory.getInstance(NioServerSocketChannel.class);
 
+    /**
+     * 通过返回SelectorProvider 生成ServerSocketChannel（nio包中的）
+     * @param provider
+     * @return
+     */
     private static ServerSocketChannel newSocket(SelectorProvider provider) {
         try {
             /**
@@ -59,6 +64,9 @@ public class NioServerSocketChannel extends AbstractNioMessageChannel
              *
              *  See <a href="https://github.com/netty/netty/issues/2308">#2308</a>.
              */
+             /*
+              *【3】 ServerSocketChannel serverSocketChannel = ServerSocketChannel.open();
+              */
             return provider.openServerSocketChannel();
         } catch (IOException e) {
             throw new ChannelException(
@@ -72,6 +80,7 @@ public class NioServerSocketChannel extends AbstractNioMessageChannel
      * Create a new instance
      */
     public NioServerSocketChannel() {
+
         this(newSocket(DEFAULT_SELECTOR_PROVIDER));
     }
 
@@ -86,7 +95,13 @@ public class NioServerSocketChannel extends AbstractNioMessageChannel
      * Create a new instance using the given {@link ServerSocketChannel}.
      */
     public NioServerSocketChannel(ServerSocketChannel channel) {
+        //初始化NioServerSocketChannel中的ServerSocketChannel，并注册OP_ACCEPT事件
+        /* 相当于nio中的如下代码
+         * serverSocketChannel = ServerSocketChannel.open();
+         * serverSocketChannel.configureBlocking(false);
+         */
         super(null, channel, SelectionKey.OP_ACCEPT);
+        //初始化NioServerSocketChannelConfig
         config = new NioServerSocketChannelConfig(this, javaChannel().socket());
     }
 
@@ -130,6 +145,9 @@ public class NioServerSocketChannel extends AbstractNioMessageChannel
     @SuppressJava6Requirement(reason = "Usage guarded by java version check")
     @Override
     protected void doBind(SocketAddress localAddress) throws Exception {
+        /*
+         *【8】 serverSocketChannel.bind(new InetSocketAddress(8080));
+         */
         if (PlatformDependent.javaVersion() >= 7) {
             javaChannel().bind(localAddress, config.getBacklog());
         } else {
@@ -144,10 +162,12 @@ public class NioServerSocketChannel extends AbstractNioMessageChannel
 
     @Override
     protected int doReadMessages(List<Object> buf) throws Exception {
+        //创建socketChannel
         SocketChannel ch = SocketUtils.accept(javaChannel());
 
         try {
             if (ch != null) {
+                //常见NioSocketChannel
                 buf.add(new NioSocketChannel(this, ch));
                 return 1;
             }

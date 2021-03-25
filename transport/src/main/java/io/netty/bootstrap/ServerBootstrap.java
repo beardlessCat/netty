@@ -51,7 +51,9 @@ public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerCh
     private final Map<ChannelOption<?>, Object> childOptions = new LinkedHashMap<ChannelOption<?>, Object>();
     private final Map<AttributeKey<?>, Object> childAttrs = new ConcurrentHashMap<AttributeKey<?>, Object>();
     private final ServerBootstrapConfig config = new ServerBootstrapConfig(this);
+    //workGroup
     private volatile EventLoopGroup childGroup;
+    //workGroup的ChannelInitializer
     private volatile ChannelHandler childHandler;
 
     public ServerBootstrap() { }
@@ -127,19 +129,31 @@ public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerCh
         return this;
     }
 
+    /**
+     * 初始化ServerSocketChannel
+     * @param channel
+     */
     @Override
     void init(Channel channel) {
+
+        //设置一些连接属性
+        //初始channel属性，也就是ChannelOption对应socket的各种属性。
+        //  比如 SO_KEEPALIVE SO_RCVBUF ... 可以与Linux中的setsockopt函数对应起来。
+        //  最后将ServerBootstrapAcceptor添加到对应channel的ChannelPipeline中。
         setChannelOptions(channel, newOptionsArray(), logger);
         setAttributes(channel, newAttributesArray());
 
         ChannelPipeline p = channel.pipeline();
-
+        // 获取childGroup和childHandler，传递给ServerBootstrapAcceptor
         final EventLoopGroup currentChildGroup = childGroup;
         final ChannelHandler currentChildHandler = childHandler;
         final Entry<ChannelOption<?>, Object>[] currentChildOptions = newOptionsArray(childOptions);
         final Entry<AttributeKey<?>, Object>[] currentChildAttrs = newAttributesArray(childAttrs);
-
+        //为 NioServerSocketChannel 添加初始化器
         p.addLast(new ChannelInitializer<Channel>() {
+            /**
+             * 在register0中，将channel注册到Selector之后，会调用invokeHandlerAddedIfNeeded，进而调用到这里的initChannel方法
+             */
             @Override
             public void initChannel(final Channel ch) {
                 final ChannelPipeline pipeline = ch.pipeline();
@@ -147,10 +161,11 @@ public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerCh
                 if (handler != null) {
                     pipeline.addLast(handler);
                 }
-
+                //channel的pipeline处理链中加入了一个ServerBootstrapAcceptor处理接收连接
                 ch.eventLoop().execute(new Runnable() {
                     @Override
                     public void run() {
+                        //添加ServerBootstrapAcceptor,将workerGroup线程组、childHandler传入及options及attrs传入。
                         pipeline.addLast(new ServerBootstrapAcceptor(
                                 ch, currentChildGroup, currentChildHandler, currentChildOptions, currentChildAttrs));
                     }
@@ -201,18 +216,21 @@ public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerCh
             };
         }
 
+        //msg为传递过来的NioServerSocketChannel
         @Override
         @SuppressWarnings("unchecked")
         public void channelRead(ChannelHandlerContext ctx, Object msg) {
             final Channel child = (Channel) msg;
-
+            //处理childHandler（workerGroup）
             child.pipeline().addLast(childHandler);
-
+            System.out.println("ServerBootstrapAcceptor中的channelRead方法执行");
             setChannelOptions(child, childOptions, logger);
             setAttributes(child, childAttrs);
 
             try {
-                childGroup.register(child).addListener(new ChannelFutureListener() {
+                //将新的nioEventGroup与channel进行绑定。boss线程池与worker线程池之间任务交接,child为NioSocketChannel
+                ChannelFuture register = childGroup.register(child);
+                register.addListener(new ChannelFutureListener() {
                     @Override
                     public void operationComplete(ChannelFuture future) throws Exception {
                         if (!future.isSuccess()) {

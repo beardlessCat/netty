@@ -42,7 +42,7 @@ public abstract class AbstractScheduledEventExecutor extends AbstractEventExecut
        @Override
        public void run() { } // Do nothing
     };
-
+    //处理定时任务
     PriorityQueue<ScheduledFutureTask<?>> scheduledTaskQueue;
 
     long nextTaskId;

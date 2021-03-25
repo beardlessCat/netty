@@ -68,7 +68,9 @@ final class PoolThreadCache {
                     int freeSweepAllocationThreshold) {
         checkPositiveOrZero(maxCachedBufferCapacity, "maxCachedBufferCapacity");
         this.freeSweepAllocationThreshold = freeSweepAllocationThreshold;
+        //堆区域
         this.heapArena = heapArena;
+        //堆外区域
         this.directArena = directArena;
         if (directArena != null) {
             smallSubPageDirectCaches = createSubPageCaches(
@@ -83,6 +85,7 @@ final class PoolThreadCache {
             smallSubPageDirectCaches = null;
             normalDirectCaches = null;
         }
+
         if (heapArena != null) {
             // Create the caches for the heap allocations
             smallSubPageHeapCaches = createSubPageCaches(

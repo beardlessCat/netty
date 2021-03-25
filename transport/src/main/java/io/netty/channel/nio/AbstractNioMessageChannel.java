@@ -76,6 +76,8 @@ public abstract class AbstractNioMessageChannel extends AbstractNioChannel {
             try {
                 try {
                     do {
+                        // doReadMessages 中执行了 accept 并创建 NioSocketChannel 作为消息放入 readBuf
+                        // readBuf 是一个 ArrayList 用来缓存消息,放的是NioSocketChannel
                         int localRead = doReadMessages(readBuf);
                         if (localRead == 0) {
                             break;
@@ -94,6 +96,7 @@ public abstract class AbstractNioMessageChannel extends AbstractNioChannel {
                 int size = readBuf.size();
                 for (int i = 0; i < size; i ++) {
                     readPending = false;
+                    //NioServerChannel的流水线，将连接消息放入流水线。head->accept->tail，执行acceptHandler#channelRead()方法
                     pipeline.fireChannelRead(readBuf.get(i));
                 }
                 readBuf.clear();

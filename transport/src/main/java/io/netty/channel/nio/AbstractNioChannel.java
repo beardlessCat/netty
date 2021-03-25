@@ -34,11 +34,7 @@ import io.netty.util.internal.logging.InternalLoggerFactory;
 
 import java.io.IOException;
 import java.net.SocketAddress;
-import java.nio.channels.CancelledKeyException;
-import java.nio.channels.ClosedChannelException;
-import java.nio.channels.ConnectionPendingException;
-import java.nio.channels.SelectableChannel;
-import java.nio.channels.SelectionKey;
+import java.nio.channels.*;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -78,9 +74,15 @@ public abstract class AbstractNioChannel extends AbstractChannel {
      */
     protected AbstractNioChannel(Channel parent, SelectableChannel ch, int readInterestOp) {
         super(parent);
+        //  ServerSocketChannel
         this.ch = ch;
+        // OP_ACCEPT 事件
         this.readInterestOp = readInterestOp;
         try {
+            //设置为非堵塞
+            /*
+             *【4】
+             */
             ch.configureBlocking(false);
         } catch (IOException e) {
             try {
@@ -372,11 +374,16 @@ public abstract class AbstractNioChannel extends AbstractChannel {
         return loop instanceof NioEventLoop;
     }
 
+    //进行真正的注册操作
     @Override
     protected void doRegister() throws Exception {
         boolean selected = false;
         for (;;) {
             try {
+                //将当前channel 注册到NioEventLoop绑定的selector上,0表示不关注任何事件,this表示当前之channel,后激活设置
+                /*
+                 *【6】SelectionKey selectionKey = serverSocketChannel.register(selector, 0, attachment);
+                 */
                 selectionKey = javaChannel().register(eventLoop().unwrappedSelector(), 0, this);
                 return;
             } catch (CancelledKeyException e) {
@@ -399,6 +406,7 @@ public abstract class AbstractNioChannel extends AbstractChannel {
         eventLoop().cancel(selectionKey());
     }
 
+    //注册感兴趣事件
     @Override
     protected void doBeginRead() throws Exception {
         // Channel.read() or ChannelHandlerContext.read() was called
@@ -410,6 +418,10 @@ public abstract class AbstractNioChannel extends AbstractChannel {
         readPending = true;
 
         final int interestOps = selectionKey.interestOps();
+        // readInterestOp 取值是 16，在 NioServerSocketChannel 创建时初始化好，代表关注 accept 事件
+        /*
+         *【9】 selectionKey.interestOps(SelectionKey.OP_ACCEPT);
+         */
         if ((interestOps & readInterestOp) == 0) {
             selectionKey.interestOps(interestOps | readInterestOp);
         }

@@ -73,12 +73,15 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
     private static final AtomicReferenceFieldUpdater<SingleThreadEventExecutor, ThreadProperties> PROPERTIES_UPDATER =
             AtomicReferenceFieldUpdater.newUpdater(
                     SingleThreadEventExecutor.class, ThreadProperties.class, "threadProperties");
-
+    //任务队列
     private final Queue<Runnable> taskQueue;
 
+    //EventLoop中的执行线程
     private volatile Thread thread;
     @SuppressWarnings("unused")
+
     private volatile ThreadProperties threadProperties;
+    //执行器
     private final Executor executor;
     private volatile boolean interrupted;
 
@@ -819,7 +822,7 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
     public void lazyExecute(Runnable task) {
         execute(ObjectUtil.checkNotNull(task, "task"), false);
     }
-
+    //增加新的任务，任务队列中增加一个新的任务(addTask(task))。判断是不是当前线程，不是的话，创建个新的线程
     private void execute(Runnable task, boolean immediate) {
         boolean inEventLoop = inEventLoop();
         addTask(task);
@@ -843,7 +846,7 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
         }
 
         if (!addTaskWakesUp && immediate) {
-            wakeup(inEventLoop);
+            wakeup(inEventLoop);//新增任务后，唤醒eventLoop中堵塞的selector
         }
     }
 
@@ -983,7 +986,7 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
                 boolean success = false;
                 updateLastExecutionTime();
                 try {
-                    SingleThreadEventExecutor.this.run();
+                    SingleThreadEventExecutor.this.run();//启动会eventLoop中的线程，一直循环监听是否有新的任务或者新的IO事件
                     success = true;
                 } catch (Throwable t) {
                     logger.warn("Unexpected exception from an event executor: ", t);

@@ -264,24 +264,31 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
      * Create a new {@link Channel} and bind it.
      */
     public ChannelFuture bind(SocketAddress localAddress) {
+        //参数校验
         validate();
+
         return doBind(ObjectUtil.checkNotNull(localAddress, "localAddress"));
     }
 
     private ChannelFuture doBind(final SocketAddress localAddress) {
+        //1.创建初始化ServerSocketChannel并注册到Selector
         final ChannelFuture regFuture = initAndRegister();
         final Channel channel = regFuture.channel();
         if (regFuture.cause() != null) {
             return regFuture;
         }
-
+        //2.  因为是 initAndRegister 异步执行，需要分两种情况来看
+        //2.1 如果已经完成，直接执行doBind0()方法
         if (regFuture.isDone()) {
             // At this point we know that the registration was complete and successful.
+            //上述操作完成则进行端口绑定
             ChannelPromise promise = channel.newPromise();
             doBind0(regFuture, channel, localAddress, promise);
             return promise;
         } else {
+        //2.2 尚未完成，则增加事件。回调中调用doBind0()方法。
             // Registration future is almost always fulfilled already, but just in case it's not.
+            // 注册一个监听器监听上述事件的完成
             final PendingRegistrationPromise promise = new PendingRegistrationPromise(channel);
             regFuture.addListener(new ChannelFutureListener() {
                 @Override
@@ -307,7 +314,12 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
     final ChannelFuture initAndRegister() {
         Channel channel = null;
         try {
+
+            /*
+             *【2】 NioServerSocketChannel attachment = new NioServerSocketChannel();
+             */
             channel = channelFactory.newChannel();
+            //1.1 初始化channel，创建NioServerSocketChannel。
             init(channel);
         } catch (Throwable t) {
             if (channel != null) {
@@ -319,7 +331,8 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
             // as the Channel is not registered yet we need to force the usage of the GlobalEventExecutor
             return new DefaultChannelPromise(new FailedChannel(), GlobalEventExecutor.INSTANCE).setFailure(t);
         }
-
+        //1.2 注册 - 做的事就是将原生 channel 注册到 selector 上
+        //NioEventLoop的register()方法最后会调用到AbstractChannel中的register()方法。向Selector注册channel
         ChannelFuture regFuture = config().group().register(channel);
         if (regFuture.cause() != null) {
             if (channel.isRegistered()) {

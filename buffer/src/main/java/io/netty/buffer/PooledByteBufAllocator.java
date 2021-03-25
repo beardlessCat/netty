@@ -38,19 +38,19 @@ import java.util.concurrent.TimeUnit;
 public class PooledByteBufAllocator extends AbstractByteBufAllocator implements ByteBufAllocatorMetricProvider {
 
     private static final InternalLogger logger = InternalLoggerFactory.getInstance(PooledByteBufAllocator.class);
-    private static final int DEFAULT_NUM_HEAP_ARENA;
-    private static final int DEFAULT_NUM_DIRECT_ARENA;
+    private static final int DEFAULT_NUM_HEAP_ARENA; //堆缓冲区区域的数量 默认16
+    private static final int DEFAULT_NUM_DIRECT_ARENA; //直接缓冲区区域的数量 默认16
 
-    private static final int DEFAULT_PAGE_SIZE;
-    private static final int DEFAULT_MAX_ORDER; // 8192 << 11 = 16 MiB per chunk
+    private static final int DEFAULT_PAGE_SIZE;  //页大小 默认8192
+    private static final int DEFAULT_MAX_ORDER; // 8192 << 11 = 16 MiB per chunk  //满二叉树的最大深度 默认11
     private static final int DEFAULT_SMALL_CACHE_SIZE;
     private static final int DEFAULT_NORMAL_CACHE_SIZE;
     static final int DEFAULT_MAX_CACHED_BUFFER_CAPACITY;
     private static final int DEFAULT_CACHE_TRIM_INTERVAL;
     private static final long DEFAULT_CACHE_TRIM_INTERVAL_MILLIS;
     private static final boolean DEFAULT_USE_CACHE_FOR_ALL_THREADS;
-    private static final int DEFAULT_DIRECT_MEMORY_CACHE_ALIGNMENT;
-    static final int DEFAULT_MAX_CACHED_BYTEBUFFERS_PER_CHUNK;
+    private static final int DEFAULT_DIRECT_MEMORY_CACHE_ALIGNMENT; //直接内存对齐 默认0
+    static final int DEFAULT_MAX_CACHED_BYTEBUFFERS_PER_CHUNK; //每个块中最大字节缓冲区的数量 和ArrayDeque有关 默认1023
 
     private static final int MIN_PAGE_SIZE = 4096;
     private static final int MAX_CHUNK_SIZE = (int) (((long) Integer.MAX_VALUE + 1) / 2);
@@ -175,7 +175,7 @@ public class PooledByteBufAllocator extends AbstractByteBufAllocator implements 
                     DEFAULT_MAX_CACHED_BYTEBUFFERS_PER_CHUNK);
         }
     }
-
+    //初始化PooledByteBufAllocator
     public static final PooledByteBufAllocator DEFAULT =
             new PooledByteBufAllocator(PlatformDependent.directBufferPreferred());
 
@@ -195,6 +195,10 @@ public class PooledByteBufAllocator extends AbstractByteBufAllocator implements 
 
     @SuppressWarnings("deprecation")
     public PooledByteBufAllocator(boolean preferDirect) {
+        //DEFAULT_NUM_HEAP_ARENA:
+        //DEFAULT_NUM_DIRECT_ARENA:
+        //DEFAULT_PAGE_SIZE:
+        //DEFAULT_MAX_ORDER:
         this(preferDirect, DEFAULT_NUM_HEAP_ARENA, DEFAULT_NUM_DIRECT_ARENA, DEFAULT_PAGE_SIZE, DEFAULT_MAX_ORDER);
     }
 
@@ -209,6 +213,8 @@ public class PooledByteBufAllocator extends AbstractByteBufAllocator implements 
      */
     @Deprecated
     public PooledByteBufAllocator(boolean preferDirect, int nHeapArena, int nDirectArena, int pageSize, int maxOrder) {
+        //DEFAULT_SMALL_CACHE_SIZE 256
+        //DEFAULT_NORMAL_CACHE_SIZE 64
         this(preferDirect, nHeapArena, nDirectArena, pageSize, maxOrder,
              0, DEFAULT_SMALL_CACHE_SIZE, DEFAULT_NORMAL_CACHE_SIZE);
     }
@@ -220,6 +226,8 @@ public class PooledByteBufAllocator extends AbstractByteBufAllocator implements 
     @Deprecated
     public PooledByteBufAllocator(boolean preferDirect, int nHeapArena, int nDirectArena, int pageSize, int maxOrder,
                                   int tinyCacheSize, int smallCacheSize, int normalCacheSize) {
+        //DEFAULT_USE_CACHE_FOR_ALL_THREADS
+        //DEFAULT_DIRECT_MEMORY_CACHE_ALIGNMENT
         this(preferDirect, nHeapArena, nDirectArena, pageSize, maxOrder, smallCacheSize,
              normalCacheSize, DEFAULT_USE_CACHE_FOR_ALL_THREADS, DEFAULT_DIRECT_MEMORY_CACHE_ALIGNMENT);
     }
@@ -264,9 +272,10 @@ public class PooledByteBufAllocator extends AbstractByteBufAllocator implements 
                                   int smallCacheSize, int normalCacheSize,
                                   boolean useCacheForAllThreads, int directMemoryCacheAlignment) {
         super(preferDirect);
+        //使用线程缓存
         threadCache = new PoolThreadLocalCache(useCacheForAllThreads);
-        this.smallCacheSize = smallCacheSize;
-        this.normalCacheSize = normalCacheSize;
+        this.smallCacheSize = smallCacheSize; //MALL缓存数量 默认256
+        this.normalCacheSize = normalCacheSize; //64
 
         if (directMemoryCacheAlignment != 0) {
             if (!PlatformDependent.hasAlignDirectByteBuffer()) {
@@ -277,7 +286,7 @@ public class PooledByteBufAllocator extends AbstractByteBufAllocator implements 
             // Ensure page size is a whole multiple of the alignment, or bump it to the next whole multiple.
             pageSize = (int) PlatformDependent.align(pageSize, directMemoryCacheAlignment);
         }
-
+        //计算块大小。默认16m
         chunkSize = validateAndCalculateChunkSize(pageSize, maxOrder);
 
         checkPositiveOrZero(nHeapArena, "nHeapArena");
@@ -295,6 +304,7 @@ public class PooledByteBufAllocator extends AbstractByteBufAllocator implements 
 
         int pageShifts = validateAndCalculatePageShifts(pageSize, directMemoryCacheAlignment);
 
+        //堆区域初始化
         if (nHeapArena > 0) {
             heapArenas = newArenaArray(nHeapArena);
             List<PoolArenaMetric> metrics = new ArrayList<PoolArenaMetric>(heapArenas.length);
@@ -310,7 +320,7 @@ public class PooledByteBufAllocator extends AbstractByteBufAllocator implements 
             heapArenas = null;
             heapArenaMetrics = Collections.emptyList();
         }
-
+        //直接缓冲区区域初始化
         if (nDirectArena > 0) {
             directArenas = newArenaArray(nDirectArena);
             List<PoolArenaMetric> metrics = new ArrayList<PoolArenaMetric>(directArenas.length);
@@ -387,10 +397,12 @@ public class PooledByteBufAllocator extends AbstractByteBufAllocator implements 
 
     @Override
     protected ByteBuf newDirectBuffer(int initialCapacity, int maxCapacity) {
+        //先获取线程本地缓存
         PoolThreadCache cache = threadCache.get();
         PoolArena<ByteBuffer> directArena = cache.directArena;
 
         final ByteBuf buf;
+        //如果heapArena不为空的话,就调用allocate，否则就用非池化的堆缓冲区
         if (directArena != null) {
             buf = directArena.allocate(cache, initialCapacity, maxCapacity);
         } else {

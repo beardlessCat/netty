@@ -72,6 +72,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
         this.parent = parent;
         id = newId();
         unsafe = newUnsafe();
+        //初始化时创建pipeline
         pipeline = newChannelPipeline();
     }
 
@@ -475,7 +476,8 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
             }
 
             AbstractChannel.this.eventLoop = eventLoop;
-
+            // 判断当前是否是EventLoop中的线程，如果是直接调用register0()方法，当前还是main()线程，所以将任务加入eventLoop中执行register0()方法，至此initAndRegister()方法结束。
+            //此处main线程切换为 nio boss 的线程
             if (eventLoop.inEventLoop()) {
                 register0(promise);
             } else {
@@ -505,20 +507,28 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
                     return;
                 }
                 boolean firstRegistration = neverRegistered;
+                //1.2.1 原生的 nio channel 绑定到 selector 上，注意此时没有注册 selector 关注事件，附件为 NioServerSocketChannel，开始真正注册
                 doRegister();
                 neverRegistered = false;
                 registered = true;
 
                 // Ensure we call handlerAdded(...) before we actually notify the promise. This is needed as the
                 // user may already fire events through the pipeline in the ChannelFutureListener.
+                /*
+                 *调用后执行后 执行ServerBootstrap#init()中pipeline中添加的initChannel()方法，pipeline中增加ServerBootstrapAcceptor Handler
+                 *  1.2.2 执行 NioServerSocketChannel 初始化器的 initChannel，增加handler
+                 * 此方法调用后会执行HandlerAdded中的handlerAdded()方法，handlerAdded()方法中会调用initChannel(ctx)方法
+                 */
                 pipeline.invokeHandlerAddedIfNeeded();
 
                 safeSetSuccess(promise);
+                //fixme 执行后去哪
                 pipeline.fireChannelRegistered();
                 // Only fire a channelActive if the channel has never been registered. This prevents firing
                 // multiple channel actives if the channel is deregistered and re-registered.
                 if (isActive()) {
                     if (firstRegistration) {
+                        // 调用pipeline中的active方法
                         pipeline.fireChannelActive();
                     } else if (config().isAutoRead()) {
                         // This channel was registered before and autoRead() is set. This means we need to begin read

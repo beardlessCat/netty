@@ -142,11 +142,11 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
             final ByteBufAllocator allocator = config.getAllocator();
             final RecvByteBufAllocator.Handle allocHandle = recvBufAllocHandle();
             allocHandle.reset(config);
-
             ByteBuf byteBuf = null;
             boolean close = false;
             try {
                 do {
+                    // 分配内存，关键在于计算分配内存的大小(小了不够，大了浪费)
                     byteBuf = allocHandle.allocate(allocator);
                     allocHandle.lastBytesRead(doReadBytes(byteBuf));
                     if (allocHandle.lastBytesRead() <= 0) {
@@ -160,14 +160,17 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
                         }
                         break;
                     }
-
+                    //计数器+1
                     allocHandle.incMessagesRead(1);
                     readPending = false;
+                    //把读取到的数据，交给管道去处理
                     pipeline.fireChannelRead(byteBuf);
                     byteBuf = null;
                 } while (allocHandle.continueReading());
 
+                //读取完成后调用readComplete，重新估算内存分配容量
                 allocHandle.readComplete();
+                //事件激发，通道中的数据读取完毕 fixme fireChannelReadComplete() 与 channelRead()的区别
                 pipeline.fireChannelReadComplete();
 
                 if (close) {

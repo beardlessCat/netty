@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 The Netty Project
+ * Copyright 2012 The Netty Project
  *
  * The Netty Project licenses this file to you under the Apache License,
  * version 2.0 (the "License"); you may not use this file except in compliance
@@ -13,21 +13,26 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package io.netty.channel;
+package io.netty.example.echo;
 
-import io.netty.util.IntSupplier;
+import io.netty.channel.EventLoop;
+import io.netty.channel.nio.NioEventLoopGroup;
 
 /**
- * Default select strategy.
+ * Echoes back any received data from a client.
  */
-final class DefaultSelectStrategy implements SelectStrategy {
-    static final SelectStrategy INSTANCE = new DefaultSelectStrategy();
-
-    private DefaultSelectStrategy() { }
-
-    @Override
-    public int calculateStrategy(IntSupplier selectSupplier, boolean hasTasks) throws Exception {
-        //根据是否有任务，没有任务返回 SelectStrategy.SELECT
-        return hasTasks ? selectSupplier.get() : SelectStrategy.SELECT;
+public final class NioEventLoopStart {
+    public static void main(String[] args) {
+        EventLoop eventLoop = new NioEventLoopGroup().next();
+        eventLoop.execute(()->{
+            System.out.println("hello");
+        });
+        eventLoop.execute(()->{
+            System.out.println("hello");
+        });
+        eventLoop.execute(()->{
+            System.out.println("hello");
+        });
     }
+
 }
