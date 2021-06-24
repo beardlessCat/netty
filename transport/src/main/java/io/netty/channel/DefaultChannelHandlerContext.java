@@ -804,7 +804,7 @@ final class DefaultChannelHandlerContext implements ChannelHandlerContext, Resou
     }
 
     private void handleOutboundHandlerException(Throwable cause) {
-        logger.warn("{} did throw an exception while handling an outbound event." +
+        logger.warn("{} threw an exception while handling an outbound event." +
                 " This is most likely a bug, closing the channel.", handler(), cause);
         close();
     }
