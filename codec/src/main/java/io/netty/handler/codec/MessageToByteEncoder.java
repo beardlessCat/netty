@@ -122,7 +122,7 @@ public abstract class MessageToByteEncoder<I> extends ChannelHandlerAdapter {
         } catch (EncoderException e) {
             promise.setFailure(e);
         } catch (Throwable e) {
-            promise.tryFailure(new EncoderException(e));
+            promise.setFailure(new EncoderException(e));
         } finally {
             if (buf != null) {
                 buf.release();

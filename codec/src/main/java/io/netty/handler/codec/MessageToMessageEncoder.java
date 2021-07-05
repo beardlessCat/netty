@@ -101,7 +101,7 @@ public abstract class MessageToMessageEncoder<I> extends ChannelHandlerAdapter {
         } catch (EncoderException e) {
             promise.setFailure(e);
         } catch (Throwable t) {
-            promise.tryFailure(new EncoderException(t));
+            promise.setFailure(new EncoderException(t));
         } finally {
             if (out != null) {
                 try {
